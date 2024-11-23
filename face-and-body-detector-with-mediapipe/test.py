@@ -11,16 +11,19 @@ with mp_holistic.Holistic(min_detection_confidence=0.5, min_tracking_confidence=
 
     while cap.isOpened():
         ret, frame = cap.read()
+        if not ret:
+            print("无法读取相机画面")
+            break
 
         # Recolor Feed
         image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        image.flags.writeable = False    
+        image.flags.writeable = False
 
         # Make Detections
         results = holistic.process(image)
 
         # Recolor image back to BGR for rendering
-        image.flags.writeable = True   
+        image.flags.writeable = True
         image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
         # 1. Draw face landmarks

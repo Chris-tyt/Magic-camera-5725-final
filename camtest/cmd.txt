@@ -1,0 +1,2 @@
+libcamera-still -o test.jpg
+sudo apt install -y libcap-dev

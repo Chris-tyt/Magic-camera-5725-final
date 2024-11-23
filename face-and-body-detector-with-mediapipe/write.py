@@ -4,7 +4,7 @@ import cv2 # Import opencv
 mp_drawing = mp.solutions.drawing_utils # Drawing helpers
 mp_holistic = mp.solutions.holistic # Mediapipe Solutions
 
-cap = cv2.VideoCapture('./video/mytest.mp4')
+cap = cv2.VideoCapture('/home/pi/workspace_group10/final/5725final/2289.mp4')
 
 # 获取视频帧宽和高，以及帧率
 frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -12,7 +12,7 @@ frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 frame_rate = int(cap.get(cv2.CAP_PROP_FPS))
 
 # 定义输出视频文件的编码格式和保存路径
-out = cv2.VideoWriter('result-my.mp4', cv2.VideoWriter_fourcc(*'H264'), frame_rate, (frame_width, frame_height))
+out = cv2.VideoWriter('result-my.mp4', cv2.VideoWriter_fourcc(*'mp4v'), frame_rate, (frame_width, frame_height))
 
 # Initiate holistic model
 with mp_holistic.Holistic(min_detection_confidence=0.5, min_tracking_confidence=0.5) as holistic:
