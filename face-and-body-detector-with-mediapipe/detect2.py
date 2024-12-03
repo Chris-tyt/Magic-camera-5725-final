@@ -72,7 +72,9 @@ picam2.start()
 
 # Initialize MediaPipe
 mp_drawing = mp.solutions.drawing_utils
-mp_holistic = mp.solutions.holistic
+mp_face_mesh = mp.solutions.face_mesh
+mp_hands = mp.solutions.hands
+# mp_holistic = mp.solutions.holistic
 
 # ----------------- frame set -----------------
 frame_count = 0
@@ -123,7 +125,9 @@ def check_option_selection(x, y):
     return None
 
 
-with mp_holistic.Holistic(min_detection_confidence=0.5, min_tracking_confidence=0.5) as holistic:
+# with mp_holistic.Holistic(min_detection_confidence=0.5, min_tracking_confidence=0.5) as holistic:
+with mp_face_mesh.FaceMesh(min_detection_confidence=0.5, min_tracking_confidence=0.5) as face_mesh, \
+     mp_hands.Hands(min_detection_confidence=0.5, min_tracking_confidence=0.5) as hands:
     while RUNNING:
         if time.time() - start_time > run_time:
             print("Time's up! Exiting...")
@@ -155,7 +159,9 @@ with mp_holistic.Holistic(min_detection_confidence=0.5, min_tracking_confidence=
                 # Convert frame to RGB and process with MediaPipe
                 image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 image.flags.writeable = False
-                results = holistic.process(image)
+                # results = holistic.process(image)
+                face_results = face_mesh.process(image)
+                hand_results = hands.process(image)
                 image.flags.writeable = True
                 image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
                 frame_count = 0
@@ -166,12 +172,12 @@ with mp_holistic.Holistic(min_detection_confidence=0.5, min_tracking_confidence=
             # frame_count += 1
 
             # Draw landmarks for face, hands, and pose
-            mp_drawing.draw_landmarks(image, results.face_landmarks, mp_holistic.FACEMESH_TESSELATION,
-                                        mp_drawing.DrawingSpec(color=(80, 110, 10), thickness=1, circle_radius=1),
-                                        mp_drawing.DrawingSpec(color=(80, 256, 121), thickness=1, circle_radius=1))
-            mp_drawing.draw_landmarks(image, results.right_hand_landmarks, mp_holistic.HAND_CONNECTIONS,
-                                        mp_drawing.DrawingSpec(color=(80, 22, 10), thickness=2, circle_radius=4),
-                                        mp_drawing.DrawingSpec(color=(80, 44, 121), thickness=2, circle_radius=2))
+            # mp_drawing.draw_landmarks(image, results.face_landmarks, mp_holistic.FACEMESH_TESSELATION,
+            #                             mp_drawing.DrawingSpec(color=(80, 110, 10), thickness=1, circle_radius=1),
+            #                             mp_drawing.DrawingSpec(color=(80, 256, 121), thickness=1, circle_radius=1))
+            # mp_drawing.draw_landmarks(image, results.right_hand_landmarks, mp_holistic.HAND_CONNECTIONS,
+            #                             mp_drawing.DrawingSpec(color=(80, 22, 10), thickness=2, circle_radius=4),
+            #                             mp_drawing.DrawingSpec(color=(80, 44, 121), thickness=2, circle_radius=2))
             # mp_drawing.draw_landmarks(image, results.left_hand_landmarks, mp_holistic.HAND_CONNECTIONS,
             #                             mp_drawing.DrawingSpec(color=(121, 22, 76), thickness=2, circle_radius=4),
             #                             mp_drawing.DrawingSpec(color=(121, 44, 250), thickness=2, circle_radius=2))
@@ -179,14 +185,58 @@ with mp_holistic.Holistic(min_detection_confidence=0.5, min_tracking_confidence=
             #                             mp_drawing.DrawingSpec(color=(245, 117, 66), thickness=2, circle_radius=4),
             #                             mp_drawing.DrawingSpec(color=(245, 66, 230), thickness=2, circle_radius=2))
 
+
+            if face_results.multi_face_landmarks:
+                for face_landmarks in face_results.multi_face_landmarks:
+                    mp_drawing.draw_landmarks(
+                        image, face_landmarks, mp_face_mesh.FACEMESH_TESSELATION,
+                        mp_drawing.DrawingSpec(color=(80, 110, 10), thickness=1, circle_radius=1),
+                        mp_drawing.DrawingSpec(color=(80, 256, 121), thickness=1, circle_radius=1))
+
+            # Draw hand landmarks
+            display_hand = False
+            gesture = "Unknown Gesture"
+            if hand_results.multi_hand_landmarks:
+                for hand_landmarks in hand_results.multi_hand_landmarks:
+                    mp_drawing.draw_landmarks(
+                        image, hand_landmarks, mp_hands.HAND_CONNECTIONS,
+                        mp_drawing.DrawingSpec(color=(80, 22, 10), thickness=2, circle_radius=4),
+                        mp_drawing.DrawingSpec(color=(80, 44, 121), thickness=2, circle_radius=2))
+                    # 检测手势
+                    thumb_tip = hand_landmarks.landmark[mp_hands.HandLandmark.THUMB_TIP]
+                    index_tip = hand_landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_TIP]
+                    middle_tip = hand_landmarks.landmark[mp_hands.HandLandmark.MIDDLE_FINGER_TIP]
+                    ring_tip = hand_landmarks.landmark[mp_hands.HandLandmark.RING_FINGER_TIP]
+                    pinky_tip = hand_landmarks.landmark[mp_hands.HandLandmark.PINKY_TIP]
+                    index_mcp = hand_landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_MCP]
+
+                    if index_tip.y < index_mcp.y and middle_tip.y > index_mcp.y and ring_tip.y > index_mcp.y:
+                        gesture = "Gesture 1"
+                    elif index_tip.y < index_mcp.y and middle_tip.y < index_mcp.y and ring_tip.y > index_mcp.y:
+                        gesture = "Gesture 2"
+                    elif index_tip.y < index_mcp.y and middle_tip.y < index_mcp.y and ring_tip.y < index_mcp.y:
+                        gesture = "Gesture 3"
+                    else:
+                        gesture = "Unknown Gesture"
+
+                    # print(f"Detected Gesture: {gesture}")
+                    display_hand = True
+                    # cv2.putText(image, gesture, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+
             # Convert image to Pygame surface and render
             image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
             image = np.rot90(image)
             surface = pygame.surfarray.make_surface(image)
             screen.blit(surface, (0, 0))
 
+            # Render gesture type to screen
+            if display_hand:
+                gesture_text = font.render(f"{gesture}", True, RED)  # Red text
+                gesture_rect = gesture_text.get_rect(topleft=(0, 0))
+                screen.blit(gesture_text, gesture_rect) # Position at the top left
+
             # Render FPS to screen
-            fps_text = font.render(f"FPS: {fps:.2f}", True, RED)  # White text
+            fps_text = font.render(f"FPS: {fps:.2f}", True, RED)  # Red text
             fps_rect = fps_text.get_rect(topright=(320, 0))
             screen.blit(fps_text, fps_rect) # Position at the top right
 
