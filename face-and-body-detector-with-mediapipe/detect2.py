@@ -33,7 +33,7 @@ GPIO.add_event_detect(27, GPIO.FALLING, callback=GPIO27_callback, bouncetime=200
 
 # Set SDL environment to ensure PiTFT display
 os.putenv('SDL_VIDEODRIVER', 'fbcon')  # Frame cache
-os.putenv('SDL_FBDEV', '/dev/fb1')
+os.putenv('SDL_FBDEV', '/dev/fb0')
 os.putenv('SDL_MOUSEDRV', 'dummy')
 os.putenv('SDL_MOUSEDEV', '/dev/null')
 os.putenv('DISPLAY', '')
