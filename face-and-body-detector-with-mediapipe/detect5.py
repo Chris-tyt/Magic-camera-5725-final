@@ -7,6 +7,7 @@ import os
 import sys
 import RPi.GPIO as GPIO
 import time
+import math
 import pygame,pigame
 from pygame.locals import *
 from cartoonize import caart
@@ -420,19 +421,47 @@ with mp_face_mesh.FaceMesh(min_detection_confidence=0.5, min_tracking_confidence
                 if face_results.multi_face_landmarks:
                     for face_landmarks in face_results.multi_face_landmarks:
                         h, w, _ = image.shape
-                        left_eye = face_landmarks.landmark[33]  # Left eye keypoint
-                        right_eye = face_landmarks.landmark[263]  # Right eye keypoint
-                        x1 = int(left_eye.x * w)
-                        y1 = int(left_eye.y * h)
-                        x2 = int(right_eye.x * w)
-                        y2 = int(right_eye.y * h)
-                        glasses_width = x2 - x1
-                        glasses_height = int(glasses_width * glasses_img.shape[0] / glasses_img.shape[1])
-                        # Ensure glasses position is within image bounds
-                        if y1 - int(glasses_height / 2) >= 0 and x1 >= 0 and (y1 + glasses_height) <= h and (x1 + glasses_width) <= w:
-                            overlay_image(image, glasses_img, x1, y1 - int(glasses_height / 2), (glasses_width, glasses_height))
-                        else:
-                            print("Glasses position is out of bounds, skipping overlay.")
+                        left_eye_landmark = face_landmarks.landmark[33]
+                        right_eye_landmark = face_landmarks.landmark[263]
+
+                        left_eye_x, left_eye_y = int(left_eye_landmark.x * w), int(left_eye_landmark.y * h)
+                        right_eye_x, right_eye_y = int(right_eye_landmark.x * w), int(right_eye_landmark.y * h)
+
+                        # 计算中点、距离、角度
+                        mid_x = (left_eye_x + right_eye_x) // 2
+                        mid_y = (left_eye_y + right_eye_y) // 2
+                        distance = math.sqrt((right_eye_x - left_eye_x)**2 + (right_eye_y - left_eye_y)**2)
+                        angle = math.degrees(math.atan2((right_eye_y - left_eye_y), (right_eye_x - left_eye_x)))
+                        # print(angle)
+
+                        # 缩放眼镜 (假设眼镜宽度等于两眼距离的1.2倍)
+                        scale_factor = 1.2
+                        new_width = int(distance * scale_factor)
+                        aspect_ratio = glasses_img.shape[0] / glasses_img.shape[1]
+                        new_height = int(new_width * aspect_ratio)
+
+                        # 先调整眼镜大小
+                        resized_glasses = cv2.resize(glasses_img, (new_width, new_height))
+                        
+                        # 计算旋转后需要的画布大小
+                        angle_rad = math.radians(-angle)  # 注意这里加了负号
+                        cos_a = abs(math.cos(angle_rad))
+                        sin_a = abs(math.sin(angle_rad))
+                        new_w = int(new_width * cos_a + new_height * sin_a)
+                        new_h = int(new_width * sin_a + new_height * cos_a)
+
+                        # 创建更大的画布以容纳旋转后的图像
+                        rot_mat = cv2.getRotationMatrix2D((new_width//2, new_height//2), -angle, 1.0)
+                        rot_mat[0, 2] += (new_w - new_width)//2
+                        rot_mat[1, 2] += (new_h - new_height)//2
+                        rotated_glasses = cv2.warpAffine(resized_glasses, rot_mat, (new_w, new_h))
+
+                        # 调整放置位置
+                        offset_y = int(new_height * 0.3)  # 减小偏移量使眼镜更贴近眼睛
+                        top_left_x = mid_x - new_w//2
+                        top_left_y = mid_y - new_h//2 - offset_y
+
+                        overlay_image(image, rotated_glasses, top_left_x, top_left_y, (new_w, new_h))
             elif mode2:
                 if face_results.multi_face_landmarks:
                     for face_landmarks in face_results.multi_face_landmarks:
@@ -481,22 +510,51 @@ with mp_face_mesh.FaceMesh(min_detection_confidence=0.5, min_tracking_confidence
             elif mode3:
                 if face_results.multi_face_landmarks:
                     for face_landmarks in face_results.multi_face_landmarks:
+                        # glasses
                         h, w, _ = image.shape
+                        left_eye_landmark = face_landmarks.landmark[33]
+                        right_eye_landmark = face_landmarks.landmark[263]
 
-                        left_eye = face_landmarks.landmark[33]  # Left eye keypoint
-                        right_eye = face_landmarks.landmark[263]  # Right eye keypoint
-                        x1 = int(left_eye.x * w)
-                        y1 = int(left_eye.y * h)
-                        x2 = int(right_eye.x * w)
-                        y2 = int(right_eye.y * h)
-                        glasses_width = x2 - x1
-                        glasses_height = int(glasses_width * glasses_img.shape[0] / glasses_img.shape[1])
-                        # Ensure glasses position is within image bounds
-                        if y1 - int(glasses_height / 2) >= 0 and x1 >= 0 and (y1 + glasses_height) <= h and (x1 + glasses_width) <= w:
-                            overlay_image(image, glasses_img, x1, y1 - int(glasses_height / 2), (glasses_width, glasses_height))
-                        else:
-                            # print("Glasses position is out of bounds, skipping overlay.")
-                            pass
+                        left_eye_x, left_eye_y = int(left_eye_landmark.x * w), int(left_eye_landmark.y * h)
+                        right_eye_x, right_eye_y = int(right_eye_landmark.x * w), int(right_eye_landmark.y * h)
+
+                        # 计算中点、距离、角度
+                        mid_x = (left_eye_x + right_eye_x) // 2
+                        mid_y = (left_eye_y + right_eye_y) // 2
+                        distance = math.sqrt((right_eye_x - left_eye_x)**2 + (right_eye_y - left_eye_y)**2)
+                        angle = math.degrees(math.atan2((right_eye_y - left_eye_y), (right_eye_x - left_eye_x)))
+                        # print(angle)
+
+                        # 缩放眼镜 (假设眼镜宽度等于两眼距离的1.2倍)
+                        scale_factor = 1.2
+                        new_width = int(distance * scale_factor)
+                        aspect_ratio = glasses_img.shape[0] / glasses_img.shape[1]
+                        new_height = int(new_width * aspect_ratio)
+
+                        # 先调整眼镜大小
+                        resized_glasses = cv2.resize(glasses_img, (new_width, new_height))
+                        
+                        # 计算旋转后需要的画布大小
+                        angle_rad = math.radians(-angle)  # 注意这里加了负号
+                        cos_a = abs(math.cos(angle_rad))
+                        sin_a = abs(math.sin(angle_rad))
+                        new_w = int(new_width * cos_a + new_height * sin_a)
+                        new_h = int(new_width * sin_a + new_height * cos_a)
+
+                        # 创建更大的画布以容纳旋转后的图像
+                        rot_mat = cv2.getRotationMatrix2D((new_width//2, new_height//2), -angle, 1.0)
+                        rot_mat[0, 2] += (new_w - new_width)//2
+                        rot_mat[1, 2] += (new_h - new_height)//2
+                        rotated_glasses = cv2.warpAffine(resized_glasses, rot_mat, (new_w, new_h))
+
+                        # 调整放置位置
+                        offset_y = int(new_height * 0.3)  # 减小偏移量使眼镜更贴近眼睛
+                        top_left_x = mid_x - new_w//2
+                        top_left_y = mid_y - new_h//2 - offset_y
+
+                        overlay_image(image, rotated_glasses, top_left_x, top_left_y, (new_w, new_h))
+                        
+                        # hat
                         
                         forehead = face_landmarks.landmark[10]  # Top of the head keypoint
                         chin = face_landmarks.landmark[152]  # Chin keypoint
@@ -539,6 +597,7 @@ with mp_face_mesh.FaceMesh(min_detection_confidence=0.5, min_tracking_confidence
                             # print("Hat position is out of bounds, skipping overlay.")
                             pass
 
+                        # cigarette
                         # Use mouth keypoints from face mesh
                         mouth_left = face_landmarks.landmark[61]  # Left corner of the mouth
                         mouth_right = face_landmarks.landmark[291]  # Right corner of the mouth
