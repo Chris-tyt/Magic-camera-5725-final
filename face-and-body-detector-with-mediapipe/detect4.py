@@ -16,7 +16,7 @@ in_start_menu = True
 
 # ----------------- time set -----------------
 start_time = time.time()
-run_time = 100
+run_time = 1000
 fps_start_time = time.time()
 fps = 0
 
@@ -57,12 +57,18 @@ YELLOW = (255, 255, 0)
 BLACK = (0, 0, 0)
 RED = (255, 0, 0)
 WHITE = (255, 255, 255)
+# Define colors for the grid
+BLUE = (0, 116, 217)      # #0074D9
+NAVY = (0, 31, 63)        # #001F3F
+GOLD = (255, 195, 0)      # #FFC300
+GRAY = (179, 179, 179)    # #B3B3B3
+BEIGE = (253, 245, 230)   # #FDF5E6
+FOREST = (34, 139, 34)    # #228B22
 
 font = pygame.font.Font(None, 30)
 font_mid = pygame.font.Font(None, 45)
 font_big = pygame.font.Font(None, 60)
-options = ['first', 'second', 'third']
-positions = [(140, 120), (140, 150), (140, 180)]
+options = ['glass', 'hat', 'all', 'sketch', 'cartoon', 'skeleton']
 clock = pygame.time.Clock()
 
 # ----------------- camera set -----------------
@@ -88,6 +94,9 @@ fps_frame_count = 0
 mode1 = False
 mode2 = False
 mode3 = False
+mode4 = False
+mode5 = False
+mode6 = False
 
 # Global variables for countdown
 countdown_active = False
@@ -101,54 +110,118 @@ if glasses_img is None:
     print("Error: Glasses image not found. Please check the path.")
     exit()
 
+# 在文件开头的图片加载部分附近添加
+button_img = cv2.imread('./button.png', cv2.IMREAD_UNCHANGED)  # 读取按钮图片
+if button_img is None:
+    print("Error: Button image not found. Please check the path.")
+    exit()
+
 # Display start menu with project title and options
 def display_start_menu():
     # Fill top half with orange and bottom half with yellow
-    screen.fill(ORANGE, rect=(0, 0, 320, 120))
-    screen.fill(YELLOW, rect=(0, 120, 320, 120))
+    screen.fill(ORANGE, rect=(0, 0, 320, 100))
+    screen.fill(YELLOW, rect=(0, 100, 320, 140))
+    
+    # Draw circles at (160, 100)
+    pygame.draw.circle(screen, YELLOW, (160, 80), 80)  # Larger yellow circle
+    pygame.draw.circle(screen, ORANGE, (160, 80), 70)  # Smaller orange circle
 
     # Display title in the middle of the top half
     title_surface_b = font_big.render('Magic', True, WHITE)
-    title_rect_b = title_surface_b.get_rect(center=(170, 50))
+    title_rect_b = title_surface_b.get_rect(center=(170, 65))
     screen.blit(title_surface_b, title_rect_b)
 
     title_surface = font_big.render('Magic', True, BLACK)
-    title_rect = title_surface.get_rect(center=(160, 60))
+    title_rect = title_surface.get_rect(center=(160, 75))
     screen.blit(title_surface, title_rect)
 
-    # Display options in a single row, evenly spaced
-    start_x = 40
-    spacing = (320 - 2 * start_x) // (len(options) - 1)
-    y_position = 180
+    # Calculate dimensions for each grid cell
+    cell_width = 320 // 3
+    cell_height = 140 // 2  # (240-100) / 2 = 70
 
+    for i in range(6):
+        row = i // 3
+        col = i % 3
+        x = col * cell_width
+        y = 100 + row * cell_height
+        # screen.fill(colors[i], rect=(x, y, cell_width, cell_height))
+        
+        # 计算按钮图片的大小和位置
+        button_size = (int(cell_width * 0.9), int(cell_height * 0.9))
+        button_x = x + (cell_width - button_size[0]) // 2
+        button_y = y + (cell_height - button_size[1]) // 2
+        
+        # 调整按钮图片大小
+        resized_button = cv2.resize(button_img, button_size)
+        # 旋转图片90度
+        rotated_button = cv2.rotate(resized_button, cv2.ROTATE_90_CLOCKWISE)
+        
+        # 正确处理透明通道
+        if rotated_button.shape[2] == 4:  # Check if there is an alpha channel
+            # Separate BGR and alpha channels
+            bgr = rotated_button[:, :, :3]
+            alpha = rotated_button[:, :, 3]
+
+            # Convert to RGB
+            rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+
+            # Create surface with alpha
+            button_surface = pygame.Surface(rgb.shape[:-1], pygame.SRCALPHA)
+
+            # Convert surface to a compatible format
+            button_surface = button_surface.convert_alpha()  # Use convert_alpha() for surfaces with alpha
+
+            pygame.surfarray.pixels3d(button_surface)[:] = rgb
+            pygame.surfarray.pixels_alpha(button_surface)[:] = alpha
+
+        screen.blit(button_surface, (button_x, button_y))
+
+    # Display options
     for i, option in enumerate(options):
-        option_surface = font.render(option, True, RED)
-        option_rect = option_surface.get_rect(center=(start_x + i * spacing, y_position))
+        row = i // 3
+        col = i % 3
+        x_position = col * cell_width + cell_width// 2
+        y_position = 100 + row * cell_height + cell_height// 2
+        
+        option_surface = font.render(f'{option}', True, BEIGE)
+        option_rect = option_surface.get_rect(center=(x_position, y_position))
         screen.blit(option_surface, option_rect)
 
     pygame.display.update()
 
 # Function to check which option is selected
 def check_option_selection(x, y):
-    global mode1, mode2, mode3
-    # Detect which button is pressed
-    start_x = 40
-    spacing = (320 - 2 * start_x) // (len(options) - 1)
-    y_position = 180
-
+    global mode1, mode2, mode3, mode4, mode5, mode6
+    # Calculate dimensions for each grid cell
+    cell_width = 320 // 3
+    cell_height = 140 // 2  # (240-100) / 2 = 70
+    
     for i, option in enumerate(options):
-        option_rect = pygame.Rect(start_x + i * spacing - 40, y_position - 20, 80, 40)  # Rectangle around text
+        row = i // 3
+        col = i % 3
+        x_position = col * cell_width + cell_width// 2
+        y_position = 100 + row * cell_height + cell_height// 2
+        
+        # Create a rectangle around the button (40 pixels padding)
+        option_rect = pygame.Rect(x_position - 40, y_position - 15, 80, 40)
+        
         if option_rect.collidepoint(x, y):
             print(option)
-            if option == 'first':
+            # Reset all modes
+            mode1 = mode2 = mode3 = mode4 = mode5 = mode6 = False
+            # Set the selected mode
+            if option == 'glass':
                 mode1 = True
-                mode2 = mode3 = False
-            elif option == 'second':
+            elif option == 'hat':
                 mode2 = True
-                mode1 = mode3 = False
-            elif option == 'third':
+            elif option == 'all':
                 mode3 = True
-                mode1 = mode2 = False
+            elif option == 'sketch':
+                mode4 = True
+            elif option == 'cartoon':
+                mode5 = True
+            elif option == 'skeleton':
+                mode6 = True
             return option
     return None
 
@@ -233,12 +306,48 @@ with mp_face_mesh.FaceMesh(min_detection_confidence=0.5, min_tracking_confidence
                     pinky_tip = hand_landmarks.landmark[mp_hands.HandLandmark.PINKY_TIP]
                     index_mcp = hand_landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_MCP]
 
-                    if index_tip.y < index_mcp.y and middle_tip.y > index_mcp.y and ring_tip.y > index_mcp.y:
+                    # Gesture 1: Only index finger up
+                    if (index_tip.y < index_mcp.y and 
+                        middle_tip.y > index_mcp.y and 
+                        ring_tip.y > index_mcp.y and 
+                        pinky_tip.y > index_mcp.y and 
+                        thumb_tip.x > index_mcp.x):
                         gesture = "Gesture 1"
-                    elif index_tip.y < index_mcp.y and middle_tip.y < index_mcp.y and ring_tip.y > index_mcp.y:
+                    # Gesture 2: Index and middle fingers up
+                    elif (index_tip.y < index_mcp.y and 
+                          middle_tip.y < index_mcp.y and 
+                          ring_tip.y > index_mcp.y and 
+                          pinky_tip.y > index_mcp.y and 
+                          thumb_tip.x > index_mcp.x):
                         gesture = "Gesture 2"
-                    elif index_tip.y < index_mcp.y and middle_tip.y < index_mcp.y and ring_tip.y < index_mcp.y:
+                    # Gesture 3: Index, middle, and ring fingers up
+                    elif (index_tip.y < index_mcp.y and 
+                          middle_tip.y < index_mcp.y and 
+                          ring_tip.y < index_mcp.y and 
+                          pinky_tip.y > index_mcp.y and 
+                          thumb_tip.x > index_mcp.x):
                         gesture = "Gesture 3"
+                    # Gesture 4: All fingers except thumb up
+                    elif (index_tip.y < index_mcp.y and 
+                          middle_tip.y < index_mcp.y and 
+                          ring_tip.y < index_mcp.y and 
+                          pinky_tip.y < index_mcp.y and 
+                          thumb_tip.x > index_mcp.x):
+                        gesture = "Gesture 4"
+                    # Gesture 5: All fingers up
+                    elif (thumb_tip.x < index_mcp.x and 
+                          index_tip.y < index_mcp.y and 
+                          middle_tip.y < index_mcp.y and 
+                          ring_tip.y < index_mcp.y and 
+                          pinky_tip.y < index_mcp.y):
+                        gesture = "Gesture 5"
+                    # Gesture 6: Only thumb and pinky up (phone gesture)
+                    elif (thumb_tip.x < index_mcp.x and 
+                          pinky_tip.y < index_mcp.y and
+                          index_tip.y > index_mcp.y and 
+                          middle_tip.y > index_mcp.y and 
+                          ring_tip.y > index_mcp.y):
+                        gesture = "Gesture 6"
                     else:
                         gesture = "Unknown Gesture"
 
@@ -250,7 +359,10 @@ with mp_face_mesh.FaceMesh(min_detection_confidence=0.5, min_tracking_confidence
                     if gesture != "Unknown Gesture" and \
                     (new_mode == "Mode 1" and gesture != "Gesture 1" or \
                     new_mode == "Mode 2" and gesture != "Gesture 2" or \
-                    new_mode == "Mode 3" and gesture != "Gesture 3"):
+                    new_mode == "Mode 3" and gesture != "Gesture 3" or \
+                    new_mode == "Mode 4" and gesture != "Gesture 4" or \
+                    new_mode == "Mode 5" and gesture != "Gesture 5" or \
+                    new_mode == "Mode 6" and gesture != "Gesture 6"):
                         print("Reset countdown")
                         countdown_active = False
                         new_mode = None
@@ -262,6 +374,12 @@ with mp_face_mesh.FaceMesh(min_detection_confidence=0.5, min_tracking_confidence
                         new_mode = "Mode 2"
                     elif gesture == "Gesture 3" and not mode3:
                         new_mode = "Mode 3"
+                    elif gesture == "Gesture 4" and not mode4:
+                        new_mode = "Mode 4"
+                    elif gesture == "Gesture 5" and not mode5:
+                        new_mode = "Mode 5"
+                    elif gesture == "Gesture 6" and not mode6:
+                        new_mode = "Mode 6"
 
                     if new_mode and not countdown_active:
                         countdown_active = True
@@ -321,6 +439,18 @@ with mp_face_mesh.FaceMesh(min_detection_confidence=0.5, min_tracking_confidence
                 mode_text = font.render("Mode 3", True, RED)
                 mode_rect = mode_text.get_rect(bottomleft=(0, 240))
                 screen.blit(mode_text, mode_rect)
+            elif mode4:
+                mode_text = font.render("Mode 4", True, RED)
+                mode_rect = mode_text.get_rect(bottomleft=(0, 240))
+                screen.blit(mode_text, mode_rect)
+            elif mode5:
+                mode_text = font.render("Mode 5", True, RED)
+                mode_rect = mode_text.get_rect(bottomleft=(0, 240))
+                screen.blit(mode_text, mode_rect)
+            elif mode6:
+                mode_text = font.render("Mode 6", True, RED)
+                mode_rect = mode_text.get_rect(bottomleft=(0, 240))
+                screen.blit(mode_text, mode_rect)
 
             # Render gesture type to screen
             if display_hand:
@@ -352,13 +482,22 @@ with mp_face_mesh.FaceMesh(min_detection_confidence=0.5, min_tracking_confidence
                     # Apply the new mode after countdown
                     if new_mode == "Mode 1":
                         mode1 = True
-                        mode2 = mode3 = False
+                        mode2 = mode3 = mode4 = mode5 = mode6 = False
                     elif new_mode == "Mode 2":
                         mode2 = True
-                        mode1 = mode3 = False
+                        mode1 = mode3 = mode4 = mode5 = mode6 = False
                     elif new_mode == "Mode 3":
                         mode3 = True
-                        mode1 = mode2 = False
+                        mode1 = mode2 = mode4 = mode5 = mode6 = False
+                    elif new_mode == "Mode 4":
+                        mode4 = True
+                        mode1 = mode2 = mode3 = mode5 = mode6 = False
+                    elif new_mode == "Mode 5":
+                        mode5 = True
+                        mode1 = mode2 = mode3 = mode4 = mode6 = False
+                    elif new_mode == "Mode 6":
+                        mode6 = True
+                        mode1 = mode2 = mode3 = mode4 = mode5 = False
                         
                     # reset new_mode and countdown_active
                     new_mode = None
