@@ -116,6 +116,11 @@ if glasses_img is None:
     print("Error: Hat image not found. Please check the path.")
     exit()
 
+cigarette_img = cv2.imread('./assets/cigarette.png', cv2.IMREAD_UNCHANGED)  # Include alpha channel
+if cigarette_img is None:
+    print("Error: Cigarette image not found. Please check the path.")
+    exit()
+
 # Add near the image loading section at the beginning of the file
 button_img = cv2.imread('./assets/button.png', cv2.IMREAD_UNCHANGED)  # Read button image
 if button_img is None:
@@ -474,7 +479,89 @@ with mp_face_mesh.FaceMesh(min_detection_confidence=0.5, min_tracking_confidence
                         else:
                             print("Hat position is out of bounds, skipping overlay.")
             elif mode3:
-                pass
+                if face_results.multi_face_landmarks:
+                    for face_landmarks in face_results.multi_face_landmarks:
+                        h, w, _ = image.shape
+
+                        left_eye = face_landmarks.landmark[33]  # Left eye keypoint
+                        right_eye = face_landmarks.landmark[263]  # Right eye keypoint
+                        x1 = int(left_eye.x * w)
+                        y1 = int(left_eye.y * h)
+                        x2 = int(right_eye.x * w)
+                        y2 = int(right_eye.y * h)
+                        glasses_width = x2 - x1
+                        glasses_height = int(glasses_width * glasses_img.shape[0] / glasses_img.shape[1])
+                        # Ensure glasses position is within image bounds
+                        if y1 - int(glasses_height / 2) >= 0 and x1 >= 0 and (y1 + glasses_height) <= h and (x1 + glasses_width) <= w:
+                            overlay_image(image, glasses_img, x1, y1 - int(glasses_height / 2), (glasses_width, glasses_height))
+                        else:
+                            # print("Glasses position is out of bounds, skipping overlay.")
+                            pass
+                        
+                        forehead = face_landmarks.landmark[10]  # Top of the head keypoint
+                        chin = face_landmarks.landmark[152]  # Chin keypoint
+                        left_cheek = face_landmarks.landmark[234]  # Left cheek keypoint
+                        right_cheek = face_landmarks.landmark[454]  # Right cheek keypoint
+                        # Calculate face width and height
+                        face_width = int(abs(right_cheek.x - left_cheek.x) * w)
+                        face_height = int(abs(chin.y - forehead.y) * h)
+
+                        # Calculate head tilt angle and invert
+                        delta_x = right_cheek.x - left_cheek.x
+                        delta_y = right_cheek.y - left_cheek.y
+                        angle = -np.arctan2(delta_y, delta_x) * (180.0 / np.pi)
+
+                        # Determine hat position and size
+                        scale_factor = 1.5  # Adjust this factor to change hat size
+                        x_hat = int(forehead.x * w) - int(face_width * scale_factor) // 2
+                        y_hat = int(forehead.y * h) - int(face_height * scale_factor) // 2 + int(0.2 * face_height)  # Move hat down
+
+                        hat_width = int(face_width * scale_factor)
+                        hat_height = int(hat_width * hat_img.shape[0] / hat_img.shape[1])
+
+                        if y_hat >= 0 and x_hat >= 0 and (y_hat + hat_height) <= h and (x_hat + hat_width) <= w:
+                            # Calculate rotation center
+                            center = (hat_img.shape[1] // 2, hat_img.shape[0] // 2)
+                            # Calculate rotation matrix
+                            rotated_hat = cv2.getRotationMatrix2D(center, angle, 1.0)
+                            # Calculate rotated bounding box
+                            cos = np.abs(rotated_hat[0, 0])
+                            sin = np.abs(rotated_hat[0, 1])
+                            new_w = int((hat_img.shape[0] * sin) + (hat_img.shape[1] * cos))
+                            new_h = int((hat_img.shape[0] * cos) + (hat_img.shape[1] * sin))
+                            # Adjust translation part of rotation matrix
+                            rotated_hat[0, 2] += (new_w / 2) - center[0]
+                            rotated_hat[1, 2] += (new_h / 2) - center[1]
+                            # Rotate image
+                            rotated_hat_img = cv2.warpAffine(hat_img, rotated_hat, (new_w, new_h), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=(0, 0, 0, 0))
+                            overlay_image(image, rotated_hat_img, x_hat, y_hat, (hat_width, hat_height))
+                        else:
+                            # print("Hat position is out of bounds, skipping overlay.")
+                            pass
+
+                        # Use mouth keypoints from face mesh
+                        mouth_left = face_landmarks.landmark[61]  # Left corner of the mouth
+                        mouth_right = face_landmarks.landmark[291]  # Right corner of the mouth
+                        mouth_center = face_landmarks.landmark[13]  # Center of the mouth
+
+                        # Calculate mouth width and height with a scaling factor
+                        scale_factor = 2.5  # Increase this factor to make the image larger
+                        mouth_width = int(abs(mouth_right.x - mouth_left.x) * w * scale_factor)
+                        mouth_height = int(mouth_width * cigarette_img.shape[0] / cigarette_img.shape[1])
+
+                        # Determine cigarette position
+                        x_cigarette = int(mouth_center.x * w) - mouth_width
+                        y_cigarette = int(mouth_center.y * h) - mouth_height // 2 - 10
+
+                        # Horizontal flip cigarette image to correct orientation
+                        flipped_cigarette = cv2.flip(cigarette_img, 1)
+
+                        # Ensure cigarette position is within image bounds
+                        if y_cigarette >= 0 and x_cigarette >= 0 and (y_cigarette + mouth_height) <= h and (x_cigarette + mouth_width) <= w:
+                            overlay_image(image, flipped_cigarette, x_cigarette, y_cigarette, (mouth_width, mouth_height))
+                        else:
+                            # print("Cigarette position is out of bounds, skipping overlay.")
+                            pass
             elif mode4:
                 # Apply sketch effect
                 cartoon_frame = sketch_image(image)
