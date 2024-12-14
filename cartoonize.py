@@ -6,6 +6,14 @@ from collections import defaultdict
 
 
 def update_c(C,hist):
+    """
+    Updates cluster centers using mean values of assigned pixels
+    Args:
+        C: Current cluster centers
+        hist: Image histogram
+    Returns:
+        Updated cluster centers and groupings
+    """
     max_iterations = 1
     for _ in range(max_iterations):
         groups=defaultdict(list)
@@ -30,7 +38,15 @@ def update_c(C,hist):
 
 # Calculates K Means clustering
 def K_histogram(hist):
-
+    """
+    Performs adaptive K-means clustering on image histogram
+    - Starts with single cluster center at 128
+    - Splits clusters that fail normality test and meet minimum size
+    Args:
+        hist: Image histogram
+    Returns:
+        Final cluster centers
+    """
     alpha=0.001
     N=80
     C=np.array([128])
@@ -66,16 +82,30 @@ def K_histogram(hist):
 
 # The main controlling function
 def caart(img):
-
+    """
+    Main cartoonization function that:
+    1. Applies bilateral filtering to reduce noise while preserving edges
+    2. Detects edges using Canny
+    3. Converts to HSV color space
+    4. Performs color quantization using adaptive clustering
+    5. Draws detected edges and applies final processing
+    Args:
+        img: Input RGB image
+    Returns:
+        Cartoonized version of input image
+    """
+    # Apply bilateral filter to reduce noise while preserving edges
     kernel=np.ones((2,2), np.uint8)
     output=np.array(img)
     x,y,c=output.shape
     for i in range(c):
         output[:,:,i]=cv2.bilateralFilter(output[:,:,i],5,150,150)
         
+    # Detect edges and convert to HSV for better color processing    
     edge=cv2.Canny(output, 100, 200)
     output=cv2.cvtColor(output,cv2.COLOR_RGB2HSV)
 
+    # Calculate histograms for each HSV channel
     hists = []
 
     hist,_=np.histogram(output[:,:,0],bins =np.arange(180+1))

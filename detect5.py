@@ -93,12 +93,12 @@ result = None
 fps_frame_count = 0
 
 # ----------------- mode flags -----------------
-mode1 = False
-mode2 = False
-mode3 = False
-mode4 = False
-mode5 = False
-mode6 = False
+mode1 = False  # Glasses filter mode
+mode2 = False  # Hat filter mode
+mode3 = False  # All filters mode (glasses + hat + cigarette)
+mode4 = False  # Sketch filter mode
+mode5 = False  # Cartoon filter mode
+mode6 = False  # Skeleton/wireframe mode
 
 # Global variables for countdown
 countdown_active = False
@@ -427,37 +427,37 @@ with mp_face_mesh.FaceMesh(min_detection_confidence=0.5, min_tracking_confidence
                         left_eye_x, left_eye_y = int(left_eye_landmark.x * w), int(left_eye_landmark.y * h)
                         right_eye_x, right_eye_y = int(right_eye_landmark.x * w), int(right_eye_landmark.y * h)
 
-                        # 计算中点、距离、角度
+                        # Calculate midpoint, distance and angle for glasses placement
                         mid_x = (left_eye_x + right_eye_x) // 2
                         mid_y = (left_eye_y + right_eye_y) // 2
                         distance = math.sqrt((right_eye_x - left_eye_x)**2 + (right_eye_y - left_eye_y)**2)
                         angle = math.degrees(math.atan2((right_eye_y - left_eye_y), (right_eye_x - left_eye_x)))
                         # print(angle)
 
-                        # 缩放眼镜 (假设眼镜宽度等于两眼距离的1.2倍)
+                        # Scale glasses (glasses width = 1.2x eye distance)
                         scale_factor = 1.2
                         new_width = int(distance * scale_factor)
                         aspect_ratio = glasses_img.shape[0] / glasses_img.shape[1]
                         new_height = int(new_width * aspect_ratio)
 
-                        # 先调整眼镜大小
+                        # Resize glasses first
                         resized_glasses = cv2.resize(glasses_img, (new_width, new_height))
-                        
-                        # 计算旋转后需要的画布大小
-                        angle_rad = math.radians(-angle)  # 注意这里加了负号
+
+                        # Calculate canvas size needed after rotation
+                        angle_rad = math.radians(-angle)  # Note the negative sign here
                         cos_a = abs(math.cos(angle_rad))
                         sin_a = abs(math.sin(angle_rad))
                         new_w = int(new_width * cos_a + new_height * sin_a)
                         new_h = int(new_width * sin_a + new_height * cos_a)
 
-                        # 创建更大的画布以容纳旋转后的图像
+                        # Create larger canvas to accommodate rotated image
                         rot_mat = cv2.getRotationMatrix2D((new_width//2, new_height//2), -angle, 1.0)
                         rot_mat[0, 2] += (new_w - new_width)//2
                         rot_mat[1, 2] += (new_h - new_height)//2
                         rotated_glasses = cv2.warpAffine(resized_glasses, rot_mat, (new_w, new_h))
 
-                        # 调整放置位置
-                        offset_y = int(new_height * 0.3)  # 减小偏移量使眼镜更贴近眼睛
+                        # Adjust placement position
+                        offset_y = int(new_height * 0.3)  # Reduce offset to make glasses closer to eyes
                         top_left_x = mid_x - new_w//2
                         top_left_y = mid_y - new_h//2 - offset_y
 
@@ -518,37 +518,37 @@ with mp_face_mesh.FaceMesh(min_detection_confidence=0.5, min_tracking_confidence
                         left_eye_x, left_eye_y = int(left_eye_landmark.x * w), int(left_eye_landmark.y * h)
                         right_eye_x, right_eye_y = int(right_eye_landmark.x * w), int(right_eye_landmark.y * h)
 
-                        # 计算中点、距离、角度
+                        # Calculate midpoint, distance and angle for glasses placement
                         mid_x = (left_eye_x + right_eye_x) // 2
                         mid_y = (left_eye_y + right_eye_y) // 2
                         distance = math.sqrt((right_eye_x - left_eye_x)**2 + (right_eye_y - left_eye_y)**2)
                         angle = math.degrees(math.atan2((right_eye_y - left_eye_y), (right_eye_x - left_eye_x)))
                         # print(angle)
 
-                        # 缩放眼镜 (假设眼镜宽度等于两眼距离的1.2倍)
+                        # Scale glasses (glasses width = 1.2x eye distance)
                         scale_factor = 1.2
                         new_width = int(distance * scale_factor)
                         aspect_ratio = glasses_img.shape[0] / glasses_img.shape[1]
                         new_height = int(new_width * aspect_ratio)
 
-                        # 先调整眼镜大小
+                        # Resize glasses first
                         resized_glasses = cv2.resize(glasses_img, (new_width, new_height))
-                        
-                        # 计算旋转后需要的画布大小
-                        angle_rad = math.radians(-angle)  # 注意这里加了负号
+
+                        # Calculate canvas size needed after rotation
+                        angle_rad = math.radians(-angle)  # Note the negative sign here
                         cos_a = abs(math.cos(angle_rad))
                         sin_a = abs(math.sin(angle_rad))
                         new_w = int(new_width * cos_a + new_height * sin_a)
                         new_h = int(new_width * sin_a + new_height * cos_a)
 
-                        # 创建更大的画布以容纳旋转后的图像
+                        # Create larger canvas to accommodate rotated image
                         rot_mat = cv2.getRotationMatrix2D((new_width//2, new_height//2), -angle, 1.0)
                         rot_mat[0, 2] += (new_w - new_width)//2
                         rot_mat[1, 2] += (new_h - new_height)//2
                         rotated_glasses = cv2.warpAffine(resized_glasses, rot_mat, (new_w, new_h))
 
-                        # 调整放置位置
-                        offset_y = int(new_height * 0.3)  # 减小偏移量使眼镜更贴近眼睛
+                        # Adjust placement position
+                        offset_y = int(new_height * 0.3)  # Reduce offset to make glasses closer to eyes
                         top_left_x = mid_x - new_w//2
                         top_left_y = mid_y - new_h//2 - offset_y
 
